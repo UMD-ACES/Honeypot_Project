@@ -33,26 +33,18 @@ MODE=1
 # 1: All the traffic dropped because of the rate limiting rules is logged in Syslog (can generate a lot of logs!) 
 LOG=0 
 
-
 ##
 # MODE=2: Ports to Open on the Honeypots 
 hp_tcp='22'
 hp_udp=''
-
-
-## 
-# Honeypots IP Addresses
-hpIPs='172.20.0.2 172.20.0.3'
-
 
 ##
 # Ports to open on HP OpenVZ Host
 tcp_ports='22' 
 udp_ports=''
 
-
 ########### DO NOT CHANGE ###############
-trusted_ip='10.0.0.0/8 172.20.0.0/16'
+trusted_ip='10.0.0.0/8'
 #########################################
 
 # Default policy
@@ -128,10 +120,7 @@ done
 # MODE 1: Allow everything on vmbr0 (to the Honeypots Containers) 
 if [ "$MODE" -eq 1 ]; then
 echo "DEBUG: Firewall MODE 1"
-for i in $hpIPs;
-do
-        /sbin/iptables -A FORWARD -d $i -j ACCEPT
-done
+/sbin/iptables -A FORWARD -d 172.20.0.0/16 -j ACCEPT
 fi 
 
 # MODE 2: Allow only certain ports
@@ -139,18 +128,12 @@ if [ "$MODE" -eq 2 ]; then
 echo "DEBUG: Firewall MODE 2"
 for i in $hp_tcp;
 do
-    for j in $hpIPs;
-    do
-            /sbin/iptables -A FORWARD -d $j -p tcp --dport $i -m state --state NEW -j ACCEPT
-    done
+	/sbin/iptables -A FORWARD -d 172.20.0.0/16 -p tcp --dport $i -m state --state NEW -j ACCEPT
 done
 
 for i in $hp_upd;
 do
-       for j in $hpIPs;
-       do
-            /sbin/iptables -A FORWARD -p udp -d $j -m udp --dport $i -j ACCEPT
-    done 
+	/sbin/iptables -A FORWARD -p udp -d 172.20.0.0/16 -m udp --dport $i -j ACCEPT
 done
 
 # Allow Ping 
@@ -170,7 +153,7 @@ fi
 
 # Create a Table udp_flood in iptables (table of actions) 
 /sbin/iptables -N udp_flood 
-/sbin/iptables -A udp_flood -m limit --limit 10/s --limit-burst 10 -j RETURN 
+/sbin/iptables -A udp_flood -m limit --limit 8/s --limit-burst 8 -j RETURN 
 
 if [ "$LOG" -eq 1 ]; then 
     /sbin/iptables -A udp_flood -j LOG --log-level info --log-prefix "[FW] Rate Limit Reached: " 
@@ -181,7 +164,7 @@ fi
 # Create a Table syn_flood in iptables (table of actions)
 /sbin/iptables -N tcp_flood
 /sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 60/minute --hashlimit-burst 10 -m state --state NEW -j DROP # Cannot have more than 20 new connections per minute, burst is 5
-# A container is not allowed to have more than 512kbytes/second of bandwidth, but permits initially 10mb
+# A container is not allowed to have more than 512kbytes/second of bandwidth
 /sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 8/sec --hashlimit-burst 8 -j DROP 
 
 if [ "$LOG" -eq 1 ]; then
@@ -197,10 +180,7 @@ fi
 ###
 
 # Allow all other HP outgoing traffic
-for i in $hpIPs;
-do
-    /sbin/iptables -A FORWARD -s $i -j ACCEPT
-done
+/sbin/iptables -A FORWARD -s 172.20.0.0/16 -j ACCEPT
 
 exit 0
 
