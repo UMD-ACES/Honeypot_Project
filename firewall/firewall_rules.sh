@@ -52,7 +52,7 @@ udp_ports=''
 
 
 ########### DO NOT CHANGE ###############
-trusted_ip='10.0.0.0/8'
+trusted_ip='10.0.0.0/8 172.20.0.0/16'
 #########################################
 
 # Default policy
@@ -91,9 +91,11 @@ do
     done
 done
 
+# Allow connections to the host on the private ip 172.20.0.1 (for the MITM)
+/sbin/iptables -A INPUT -d 172.20.0.1 -p tcp ! --dport 22 -j ACCEPT
+
 # Allow related/established connections
 /sbin/iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
-
 
 ###############
 ## Honeypots ##
@@ -178,9 +180,9 @@ fi
 
 # Create a Table syn_flood in iptables (table of actions)
 /sbin/iptables -N tcp_flood
-/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 20/minute --hashlimit-burst 5 -m state --state NEW -j DROP # Cannot have more than 20 new connections per minute, burst is 5
+/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 60/minute --hashlimit-burst 10 -m state --state NEW -j DROP # Cannot have more than 20 new connections per minute, burst is 5
 # A container is not allowed to have more than 512kbytes/second of bandwidth, but permits initially 10mb
-/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-dstmask 32 --hashlimit-above 1kb/s --hashlimit-burst 1kb -j DROP 
+/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 8/sec --hashlimit-burst 8 -j DROP 
 
 if [ "$LOG" -eq 1 ]; then
     /sbin/iptables -A tcp_flood -j LOG --log-level info --log-prefix "[FW] Rate Limit Reached: "
@@ -189,32 +191,6 @@ fi
 # Traffic matching UDP/TCP flood goes to the table
 /sbin/iptables -I FORWARD 2 -s 172.20.0.0/16 -p udp -j udp_flood
 /sbin/iptables -I FORWARD 2 -s 172.20.0.0/16 -p tcp -j tcp_flood
-
-: '
-for i in $hpIPs;
-do
-    # Traffic matching UDP/TCP flood goes to the table
-    #/sbin/iptables -A FORWARD -o vmbr0 -s $i -p udp -j syn_flood 
-    #/sbin/iptables -A FORWARD -o vmbr0 -s $i -p tcp --syn -j syn_flood 
-
-    # SSH limitations
-    /sbin/iptables -A FORWARD -o vmbr0 -s $i -p tcp --dport 22 -m state --state NEW -m recent --set --name SSH 
-    if [ "$LOG" -eq 1 ]; then 
-         /sbin/iptables -A FORWARD -o vmbr0 -s $i -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 8 --rttl --name SSH -j LOG --log-level info --log-prefix "[FW] SSH SCAN blocked: " 
-    fi
-    /sbin/iptables -A FORWARD -o vmbr0 -s $i -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 8 --rttl --name SSH -j DROP 
-
-    # RDP limitations
-    /sbin/iptables -A FORWARD -o vmbr0 -s $i -p tcp --dport 3389 -m state --state NEW -m recent --set --name RDP 
-        if [ "$LOG" -eq 1 ]; then
-        /sbin/iptables -A FORWARD -o br0 -s $i -p tcp --dport 3389 -m state --state NEW -m recent --update --seconds 60 --hitcount 8 --rttl --name RDP -j LOG --log-level info --log-prefix "[FW] RDP SCAN blocked: " 
-    fi
-    /sbin/iptables -A FORWARD -o br0 -s $i -p tcp --dport 3389 -m state --state NEW -m recent --update --seconds 60 --hitcount 8 --rttl --name RDP -j DROP  
-
-    # HTTP limits
-    /sbin/iptables  -A FORWARD -o br0 -s $i -p tcp --dport 80 -m limit --limit 25/minute --limit-burst 100 -j ACCEPT 
-done
-'
 
 ####
 ## Outgoing Traffic 
