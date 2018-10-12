@@ -7,15 +7,15 @@ pve-firewall restart
 
 ##
 # Reset the firewall 
-iptables -F
-iptables -X
-#iptables -t nat -F
-#iptables -t nat -X
-iptables -t mangle -F
-iptables -t mangle -X
-iptables -P INPUT ACCEPT
-iptables -P FORWARD ACCEPT
-iptables -P OUTPUT ACCEPT
+/sbin/iptables -F
+/sbin/iptables -X
+#/sbin/iptables -t nat -F
+#/sbin/iptables -t nat -X
+/sbin/iptables -t mangle -F
+/sbin/iptables -t mangle -X
+/sbin/iptables -P INPUT ACCEPT
+/sbin/iptables -P FORWARD ACCEPT
+/sbin/iptables -P OUTPUT ACCEPT
 
 
 ##
