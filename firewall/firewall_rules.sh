@@ -132,7 +132,7 @@ do
 	/sbin/iptables -A FORWARD -d 172.20.0.0/16 -p tcp --dport $i -m state --state NEW -j ACCEPT
 done
 
-for i in $hp_upd;
+for i in $hp_udp;
 do
 	/sbin/iptables -A FORWARD -p udp -d 172.20.0.0/16 -m udp --dport $i -j ACCEPT
 done
