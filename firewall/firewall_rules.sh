@@ -44,7 +44,7 @@ tcp_ports='22'
 udp_ports=''
 
 ########### DO NOT CHANGE ###############
-trusted_ip='10.0.0.0/8'
+trusted_ip='172.30.0.0/16'
 #########################################
 
 # Default policy
