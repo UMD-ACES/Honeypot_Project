@@ -19,7 +19,6 @@ pve-firewall restart
 
 sysctl -w net.bridge.bridge-nf-call-iptables=1
 
-
 ##
 # Firewall Mode 
 ##
