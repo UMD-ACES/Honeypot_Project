@@ -181,7 +181,7 @@ fi
 ###
 
 # Allow all other HP outgoing traffic
-#/sbin/iptables -A FORWARD -s 172.20.0.0/16 -j ACCEPT
+/sbin/iptables -A FORWARD -s 172.20.0.0/16 -j ACCEPT
 
 exit 0
 
