@@ -45,7 +45,7 @@ tcp_ports='22'
 udp_ports=''
 
 ########### DO NOT CHANGE ###############
-trusted_ip='172.30.0.0/16'
+trusted_ip='172.30.0.0/16 10.255.0.0/16'
 #########################################
 
 # Default policy
@@ -137,9 +137,6 @@ do
 	/sbin/iptables -A FORWARD -p udp -d 172.20.0.0/16 -m udp --dport $i -j ACCEPT
 done
 
-# Allow Ping 
-/sbin/iptables -A FORWARD -p icmp -m icmp --icmp-type any -j ACCEPT
-
 fi 
 
 if [ "$MODE" -eq 3 ]; then
@@ -147,6 +144,9 @@ if [ "$MODE" -eq 3 ]; then
     # Default policy drops all @ FORWARD 
     exit 0
 fi
+
+# Allow Ping 
+/sbin/iptables -A FORWARD -p icmp -m icmp --icmp-type any -j ACCEPT
 
 ####
 ## Rate Limiting 
@@ -181,7 +181,7 @@ fi
 ###
 
 # Allow all other HP outgoing traffic
-/sbin/iptables -A FORWARD -s 172.20.0.0/16 -j ACCEPT
+#/sbin/iptables -A FORWARD -s 172.20.0.0/16 -j ACCEPT
 
 exit 0
 
