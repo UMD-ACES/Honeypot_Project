@@ -40,7 +40,7 @@ hp_tcp='22'
 hp_udp=''
 
 ##
-# Ports to open on HP OpenVZ Host
+# Ports to open on the Proxmox Host
 tcp_ports='22' 
 udp_ports=''
 
