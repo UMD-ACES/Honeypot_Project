@@ -3,7 +3,7 @@
 # Super fancy Firewall 
 #
 
-pve-firewall restart
+#pve-firewall restart
 
 ##
 # Reset the firewall 
