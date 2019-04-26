@@ -166,7 +166,7 @@ fi
 /sbin/iptables -N tcp_flood
 /sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 60/minute --hashlimit-burst 10 -m state --state NEW -j DROP # Cannot have more than 60 new connections per minute, burst is 10
 # A container is not allowed to have more than 512kbytes/second of bandwidth
-/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 8/sec --hashlimit-burst 8 -j DROP 
+#/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 8/sec --hashlimit-burst 8 -j DROP 
 
 if [ "$LOG" -eq 1 ]; then
     /sbin/iptables -A tcp_flood -j LOG --log-level info --log-prefix "[FW] Rate Limit Reached: "
