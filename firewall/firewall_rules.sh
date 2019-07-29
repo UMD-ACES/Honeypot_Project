@@ -154,7 +154,7 @@ fi
 
 # Create a Table udp_flood in iptables (table of actions) 
 /sbin/iptables -N udp_flood 
-/sbin/iptables -A udp_flood -m limit --limit 8/s --limit-burst 8 -j RETURN 
+/sbin/iptables -A udp_flood -m hashlimit --hashlimit-name UDP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-upto 60/minute --hashlimit-burst 10 -j RETURN 
 
 if [ "$LOG" -eq 1 ]; then 
     /sbin/iptables -A udp_flood -j LOG --log-level info --log-prefix "[FW] Rate Limit Reached: " 
@@ -164,13 +164,15 @@ fi
 
 # Create a Table syn_flood in iptables (table of actions)
 /sbin/iptables -N tcp_flood
-/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 60/minute --hashlimit-burst 10 -m state --state NEW -j DROP # Cannot have more than 60 new connections per minute, burst is 10
+/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_FLOOD --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-upto 60/minute --hashlimit-burst 10 -m state --state NEW -j RETURN # Cannot have more than 60 new connections per minute, burst is 10
 # A container is not allowed to have more than 512kbytes/second of bandwidth
 #/sbin/iptables -A tcp_flood -m hashlimit --hashlimit-name TCP_BANDWIDTH --hashlimit-mode srcip --hashlimit-srcmask 32 --hashlimit-above 8/sec --hashlimit-burst 8 -j DROP 
 
 if [ "$LOG" -eq 1 ]; then
     /sbin/iptables -A tcp_flood -j LOG --log-level info --log-prefix "[FW] Rate Limit Reached: "
 fi
+
+/sbin/iptables -A tcp_flood -j DROP
 
 # Traffic matching UDP/TCP flood goes to the table
 /sbin/iptables -I FORWARD 2 -s 172.20.0.0/16 -p udp -j udp_flood
