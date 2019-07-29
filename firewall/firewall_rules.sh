@@ -175,8 +175,8 @@ fi
 /sbin/iptables -A tcp_flood -j DROP
 
 # Traffic matching UDP/TCP flood goes to the table
-/sbin/iptables -I FORWARD 2 -s 172.20.0.0/16 -p udp -j udp_flood
-/sbin/iptables -I FORWARD 2 -s 172.20.0.0/16 -p tcp -j tcp_flood
+/sbin/iptables -I FORWARD 3 -s 172.20.0.0/16 -p udp -j udp_flood
+/sbin/iptables -I FORWARD 3 -s 172.20.0.0/16 -p tcp -j tcp_flood
 
 ####
 ## Outgoing Traffic 
