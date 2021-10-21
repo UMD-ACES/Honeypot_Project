@@ -69,6 +69,9 @@ trusted_ip='172.30.0.0/16 10.255.0.0/16 192.168.11.0/24'
 # Allow loopback
 /sbin/iptables -A INPUT -i lo -j ACCEPT
 
+# Allow DNS
+/sbin/iptables -A INPUT -s $CONTAINER_NETWORK -p udp --dport 53 -m state --state NEW -j ACCEPT
+
 # Allow TCP port listed in tcp_ports
 for i in $tcp_ports;
 do
@@ -109,19 +112,19 @@ done
 # To block some Internet IP, use the -s <Attacker Public IP> parameter                    #
 #                                                                                         #
 # for example:                                                                            #
-# /sbin/iptables -A FORWARD -i vmbr0 -d 172.20.0.2 -p tcp --dport 22 -j DROP              #
+# /sbin/iptables -A FORWARD -i lxcbr0 -d 172.20.0.2 -p tcp --dport 22 -j DROP              #
 #    will block SSH traffic to 172.20.0.2)                                                #
 #                                                                                         #
-# /sbin/iptables -A FORWARD -i vmbr0 -s 8.8.8.8 -d 172.20.0.2 -p tcp --dport 22 -j DROP   #
+# /sbin/iptables -A FORWARD -i lxcbr0 -s 8.8.8.8 -d 172.20.0.2 -p tcp --dport 22 -j DROP   #
 #    will block SSH traffic to 172.20.0.2 coming from 8.8.8.8 only)                       #
 ###########################################################################################
 
 # Block container to container communication
-/sbin/iptables -A FORWARD -i vmbr0 -o vmbr0 -s $CONTAINER_GATEWAY -d $CONTAINER_NETWORK -j ACCEPT # Accept connection from host to honeypots
-/sbin/iptables -A FORWARD -i vmbr0 -o vmbr0 -s $CONTAINER_NETWORK -d $CONTAINER_GATEWAY -j ACCEPT # Accept connection form honeypots to host
-/sbin/iptables -A FORWARD -i vmbr0 -o vmbr0 -s $CONTAINER_NETWORK -d $CONTAINER_NETWORK -j DROP
+/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_GATEWAY -d $CONTAINER_NETWORK -j ACCEPT # Accept connection from host to honeypots
+/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_NETWORK -d $CONTAINER_GATEWAY -j ACCEPT # Accept connection form honeypots to host
+/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_NETWORK -d $CONTAINER_NETWORK -j DROP
 
-# MODE 1: Allow everything on vmbr0 (to the Honeypots Containers)
+# MODE 1: Allow everything on lxcbr0 (to the Honeypots Containers)
 if [ "$MODE" -eq 1 ]; then
 echo "DEBUG: Firewall MODE 1"
 /sbin/iptables -A FORWARD -d $CONTAINER_NETWORK -j ACCEPT
