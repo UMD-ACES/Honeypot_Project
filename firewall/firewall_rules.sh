@@ -27,8 +27,16 @@ sysctl -w net.bridge.bridge-nf-call-iptables=1
 # Mode 3: Block the Honeypots
 MODE=1
 
+# NOTE: MITM should listen on the $CONTAINER_GATEWAY IP, other IPs will get blocked by this firewall
+
+##
+# Container network settings
+##
+# Update this if your container IP address and network is different
+#
 CONTAINER_NETWORK="10.0.3.1/24"
 CONTAINER_GATEWAY="10.0.3.1"
+CONTAINER_INTERFACE="lxcbr0"
 
 ##
 # Rate Limiting Logging
@@ -43,9 +51,9 @@ hp_tcp='22'
 hp_udp=''
 
 ##
-# Ports to open on the Proxmox Host
-tcp_ports='22'
-udp_ports=''
+# Ports to open on the Host
+host_tcp='22'
+host_udp=''
 
 ########### DO NOT CHANGE ###############
 trusted_ip='172.30.0.0/16 10.255.0.0/16 192.168.11.0/24'
@@ -56,45 +64,46 @@ trusted_ip='172.30.0.0/16 10.255.0.0/16 192.168.11.0/24'
 /sbin/iptables -P INPUT DROP
 /sbin/iptables -F FORWARD
 /sbin/iptables -P FORWARD DROP
-/sbin/iptables -A FORWARD -s 0.0.0.0/0.0.0.0 -d 0.0.0.0/0.0.0.0 -m state --state INVALID -j DROP
-/sbin/iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+/sbin/iptables -A FORWARD -s 0.0.0.0/0.0.0.0 -d 0.0.0.0/0.0.0.0 -m state --state INVALID -j DROP -m comment --comment "Drop invalid connections"
+/sbin/iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "Allow existing connections"
 /sbin/iptables -F OUTPUT
 /sbin/iptables -P OUTPUT ACCEPT
 
 
 ####################
-## Proxmox Host ##
+## Host ##
 ####################
 
-# Allow loopback
-/sbin/iptables -A INPUT -i lo -j ACCEPT
+# Allow lxc-net service
+/sbin/iptables -A INPUT -i $CONTAINER_INTERFACE -p tcp -m tcp --dport 53 -j ACCEPT -m comment --comment "Container Network DNS TCP"
+/sbin/iptables -A INPUT -i $CONTAINER_INTERFACE -p udp -m udp --dport 53 -j ACCEPT -m comment --comment "Container Network DNS UDP"
+/sbin/iptables -A INPUT -i $CONTAINER_INTERFACE -p tcp -m tcp --dport 67 -j ACCEPT -m comment --comment "Container Network DHCP TCP"
+/sbin/iptables -A INPUT -i $CONTAINER_INTERFACE -p udp -m udp --dport 67 -j ACCEPT -m comment --comment "Container Network DHCP UDP"
+/sbin/iptables -A INPUT -i lo -j ACCEPT -m comment --comment "Allow local loopback"
 
-# Allow DNS
-/sbin/iptables -A INPUT -s $CONTAINER_NETWORK -p udp --dport 53 -m state --state NEW -j ACCEPT
-
-# Allow TCP port listed in tcp_ports
-for i in $tcp_ports;
+# Allow TCP port listed in host_tcp
+for i in $host_tcp;
 do
     for ip in $trusted_ip;
     do
-        /sbin/iptables -A INPUT -s $ip -p tcp --dport $i -m state --state NEW -j ACCEPT
+        /sbin/iptables -A INPUT -s "$ip" -p tcp --dport $i -m state --state NEW -j ACCEPT
     done
 done
 
-# Allow UDP port listed in udp_ports
-for i in $udp_ports;
+# Allow UDP port listed in host_udp
+for i in $host_udp;
 do
     for ip in $trusted_ip;
     do
-        /sbin/iptables -A INPUT -s $ip -p udp -m udp --dport $i -j ACCEPT
+        /sbin/iptables -A INPUT -s "$ip" -p udp -m udp --dport $i -j ACCEPT
     done
 done
 
 # Allow connections to the host on the private ip $CONTAINER_GATEWAY (for the MITM)
-/sbin/iptables -A INPUT -d $CONTAINER_GATEWAY -p tcp ! --dport 22 -j ACCEPT
+/sbin/iptables -A INPUT -d $CONTAINER_GATEWAY -p tcp ! --dport 22 -j ACCEPT -m comment --comment "Allow connections to the host for MITM"
 
 # Allow related/established connections
-/sbin/iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+/sbin/iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT -m comment --comment "Allow related/established connections"
 
 ###############
 ## Honeypots ##
@@ -120,14 +129,18 @@ done
 ###########################################################################################
 
 # Block container to container communication
-/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_GATEWAY -d $CONTAINER_NETWORK -j ACCEPT # Accept connection from host to honeypots
-/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_NETWORK -d $CONTAINER_GATEWAY -j ACCEPT # Accept connection form honeypots to host
-/sbin/iptables -A FORWARD -i lxcbr0 -o lxcbr0 -s $CONTAINER_NETWORK -d $CONTAINER_NETWORK -j DROP
+/sbin/iptables -A FORWARD -i $CONTAINER_INTERFACE -o $CONTAINER_INTERFACE -s $CONTAINER_GATEWAY -d $CONTAINER_NETWORK -j ACCEPT -m comment --comment "Accept connection from host to honeypots"
+/sbin/iptables -A FORWARD -i $CONTAINER_INTERFACE -o $CONTAINER_INTERFACE -s $CONTAINER_NETWORK -d $CONTAINER_GATEWAY -j ACCEPT -m comment --comment "Accept connection from honeypots to host"
+/sbin/iptables -A FORWARD -i $CONTAINER_INTERFACE -o $CONTAINER_INTERFACE -s $CONTAINER_NETWORK -d $CONTAINER_NETWORK -j DROP -m comment --comment "Drop connection between honeypots"
 
-# MODE 1: Allow everything on lxcbr0 (to the Honeypots Containers)
+# Forward container traffic for lxc-net
+/sbin/iptables -A FORWARD -o $CONTAINER_INTERFACE -j ACCEPT -m comment --comment "Forward Container traffic"
+/sbin/iptables -A FORWARD -i $CONTAINER_INTERFACE -j ACCEPT -m comment --comment "Forward Container traffic"
+
+# MODE 1: Allow everything on $CONTAINER_INTERFACE (to the Honeypots Containers)
 if [ "$MODE" -eq 1 ]; then
 echo "DEBUG: Firewall MODE 1"
-/sbin/iptables -A FORWARD -d $CONTAINER_NETWORK -j ACCEPT
+/sbin/iptables -A FORWARD -d $CONTAINER_NETWORK -j ACCEPT -m comment --comment "Allow connections to the honeypots"
 fi
 
 # MODE 2: Allow only certain ports
@@ -152,7 +165,7 @@ if [ "$MODE" -eq 3 ]; then
 fi
 
 # Allow Ping
-/sbin/iptables -A FORWARD -p icmp -m icmp --icmp-type any -j ACCEPT
+/sbin/iptables -A FORWARD -p icmp -m icmp --icmp-type any -j ACCEPT -m comment --comment "Allow ICMP (Ping)"
 
 ####
 ## Rate Limiting
@@ -189,7 +202,7 @@ fi
 ###
 
 # Allow all other HP outgoing traffic
-/sbin/iptables -A FORWARD -s $CONTAINER_NETWORK -j ACCEPT
+/sbin/iptables -A FORWARD -s $CONTAINER_NETWORK -j ACCEPT -m comment --comment "Allow all other honeypot outgoing"
 
 exit 0
 
