@@ -1,6 +1,13 @@
 #!/bin/sh -e
 #
-# Super fancy Firewall
+# "Super fancy Firewall"
+# Division of IT
+#
+#
+# To enable the firewall, you may need to enable the br_netfilter kernel module
+# by running the following commands:
+# modprobe br_netfilter
+# sysctl -p /etc/sysctl.conf
 #
 
 #pve-firewall restart
