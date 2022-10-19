@@ -108,6 +108,7 @@ done
 
 # Allow connections to the host on the private ip $CONTAINER_GATEWAY (for the MITM)
 /sbin/iptables -A INPUT -d $CONTAINER_GATEWAY -p tcp ! --dport 22 -j ACCEPT -m comment --comment "Allow connections to the host for MITM"
+/sbin/iptables -A INPUT -d 127.0.0.1 -p tcp ! --dport 22 -j ACCEPT -m comment --comment "Allow connections to localhost for MITM"
 
 # Allow related/established connections
 /sbin/iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT -m comment --comment "Allow related/established connections"
